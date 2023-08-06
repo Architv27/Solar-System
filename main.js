@@ -20,7 +20,6 @@ var sunMaterial = new THREE.MeshPhongMaterial({
 var sun = new THREE.Mesh(sunGeometry, sunMaterial);
 scene.add(sun);
 
-
 function createAsteroid() {
     var textureLoader = new THREE.TextureLoader();
     var asteroidTexture = textureLoader.load("./textures/asteroid.jpg"); // Path to your texture file
@@ -34,9 +33,6 @@ function createAsteroid() {
     });
     return new THREE.Mesh(geometry, material);
 }
-
-// Asteroid belt between Mars and Jupiter
-
 
 // Planets
 var planetSizes = [0.387, 0.949, 1, 0.533, 4.452, 1.969, 1.887, 0.900];
@@ -60,14 +56,15 @@ for (var i = 0; i < 8; i++) {
     // planets.push({ mesh: planet, distance: distance, speed: 0.0001 + i * 0.00002, angle: 0 });
     
     // Adding Saturn's ring
-    if (i == 5) {
+    if (i == 5) { // Saturn is the 6th planet (0-index based)
         var ringGeometry = new THREE.RingGeometry(6, 8, 64);
         var ringMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, side: THREE.DoubleSide });
         var ring = new THREE.Mesh(ringGeometry, ringMaterial);
-        ring.rotation.x = Math.PI / 2;
-        planets[i].ring = ring;
-        scene.add(ring);
+        ring.rotation.x = Math.PI / 2; // Rotate the ring to be horizontal
+        planets[i].ring = ring; // Store the ring in the planet's data
+        scene.add(ring); // Add ring to the scene
     }
+
 
     scene.add(planet);
 
@@ -113,6 +110,34 @@ for (var i = 0; i < numAsteroids; i++) {
 }
 
 scene.add(asteroidBelt);
+
+// Create a starfield
+var starsGeometry = new THREE.BufferGeometry();
+var positions = [];
+
+for ( var i = 0; i < 10000; i ++ ) {
+
+    var x = THREE.MathUtils.randFloatSpread(2000); 
+    var y = THREE.MathUtils.randFloatSpread(2000); 
+    var z = THREE.MathUtils.randFloatSpread(2000); 
+
+    positions.push(x, y, z);
+
+}
+
+starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
+var starMaterial = new THREE.PointsMaterial({ color: 0x888888 });
+
+var starField = new THREE.Points(starsGeometry, starMaterial);
+
+scene.add(starField);
+
+
+
+// Variable to keep track of time
+var clock = new THREE.Clock();
+
 // Lighting
 var ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.2);
 scene.add(ambientLight);
@@ -258,32 +283,39 @@ window.addEventListener('wheel', function(event) {
 });
 
 var animate = function () {
-requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
 
-planets.forEach(function (planet, index) {
-var theta = planet.angle;
-var orbitRadiusX = planet.distance;
-var orbitRadiusY = planet.distance * 0.8;
-var x = Math.cos(theta) * orbitRadiusX;
-var y = Math.sin(theta) * orbitRadiusY;
-planet.mesh.position.set(x, 0, y);
-planet.angle += planet.speed;
-    // Rotating planet on its axis
+    planets.forEach(function (planet, index) {
+        var theta = planet.angle;
+        var orbitRadiusX = planet.distance;
+        var orbitRadiusY = planet.distance * 0.8;
+        var x = Math.cos(theta) * orbitRadiusX;
+        var y = Math.sin(theta) * orbitRadiusY;
+        planet.mesh.position.set(x, 0, y);
+        planet.angle += planet.speed;
 
-// Update spotlight target to follow planet
-spotLights[index].target.position.set(x, 0, y);
-});
-// Animate asteroid belt
-asteroidBelt.forEach(function (asteroid) {
-    var theta = asteroid.angle;
-    var radiusX = asteroid.radius; // Using stored radius
-    var radiusY = asteroid.radius * 0.8; // Elliptical shape
-    var x = Math.cos(theta) * radiusX;
-    var z = Math.sin(theta) * radiusY;
-    asteroid.position.set(x, 0, z);
-    asteroid.angle += asteroid.speed;
-});
+        // Rotating planet on its axis
+        planet.mesh.rotation.y += planet.rotationSpeed/50;
 
-renderer.render(scene, camera);
+        // Update spotlight target to follow planet
+        spotLights[index].target.position.set(x, 0, y);
+    });
+    // Star twinkling
+    var time = clock.getElapsedTime();
+    starField.material.opacity = (1 + Math.sin(time * 0.5)) * 0.5; // Adjust frequency and amplitude for different effects
+
+    // Animate asteroid belt
+    asteroidBelt.forEach(function (asteroid) {
+        var theta = asteroid.angle;
+        var radiusX = asteroid.radius; // Using stored radius
+        var radiusY = asteroid.radius * 0.8; // Elliptical shape
+        var x = Math.cos(theta) * radiusX;
+        var z = Math.sin(theta) * radiusY;
+        asteroid.position.set(x, 0, z);
+        asteroid.angle += asteroid.speed;
+    });
+
+    renderer.render(scene, camera);
 };
+
 animate();
