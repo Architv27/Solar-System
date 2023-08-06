@@ -55,15 +55,21 @@ for (var i = 0; i < 8; i++) {
     planets.push({ mesh: planet, distance: distance, speed: revolutionSpeedFactor + 0.0008, angle: 0, rotationSpeed: rotationSpeedFactor });
     // planets.push({ mesh: planet, distance: distance, speed: 0.0001 + i * 0.00002, angle: 0 });
     
-    // Adding Saturn's ring
     if (i == 5) { // Saturn is the 6th planet (0-index based)
-        var ringGeometry = new THREE.RingGeometry(6, 8, 64);
-        var ringMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, side: THREE.DoubleSide });
+        var innerRadius = 2.5; // Adjust this value to make the ring smaller
+        var outerRadius = 3.0; // Adjust this value to make the ring smaller
+        var ringGeometry = new THREE.RingGeometry(innerRadius, outerRadius, 24);
+        var ringMaterial = new THREE.MeshBasicMaterial({ color: 0xceb8b8, side: THREE.DoubleSide });
         var ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    
+        ring.position.y = 0; // Make sure the ring is centered around the planet
         ring.rotation.x = Math.PI / 2; // Rotate the ring to be horizontal
-        planets[i].ring = ring; // Store the ring in the planet's data
-        scene.add(ring); // Add ring to the scene
+        ring.rotation.z = THREE.MathUtils.degToRad(78); // Tilt the ring by 78 degrees
+    
+        planet.add(ring); // Add ring to the Saturn planet mesh
     }
+    
+    
 
 
     scene.add(planet);
@@ -111,29 +117,49 @@ for (var i = 0; i < numAsteroids; i++) {
 
 scene.add(asteroidBelt);
 
-// Create a starfield
-var starsGeometry = new THREE.BufferGeometry();
-var positions = [];
+    var starsGeometry = new THREE.BufferGeometry();
+    var positions = [];
 
-for ( var i = 0; i < 10000; i ++ ) {
+    for ( var i = 0; i < 10000; i ++ ) {
+        var x = THREE.MathUtils.randFloatSpread(2000); 
+        var y = THREE.MathUtils.randFloatSpread(2000); 
+        var z = THREE.MathUtils.randFloatSpread(2000); 
 
-    var x = THREE.MathUtils.randFloatSpread(2000); 
-    var y = THREE.MathUtils.randFloatSpread(2000); 
-    var z = THREE.MathUtils.randFloatSpread(2000); 
+        positions.push(x, y, z);
+    }
 
-    positions.push(x, y, z);
+    starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 
-}
+    var starMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            time: { value: 1.0 },
+            resolution: { value: new THREE.Vector2() }
+        },
+        vertexShader: `
+            uniform float time;
+            void main() {
+                vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+                gl_PointSize = 2.0 * ( 300.0 / -mvPosition.z );
+                gl_Position = projectionMatrix * mvPosition;
+            }
+        `,
+        fragmentShader: `
+            uniform float time;
+            void main() {
+                float dist = length(gl_PointCoord - vec2(0.5));
+                float alpha = 1.0 - smoothstep(0.4, 0.5, dist);
+                vec4 starColor = vec4(1.0, 1.0, 1.0, alpha);
+                starColor.a *= sin(time * 0.9);
+                if (starColor.a < 0.0) discard;
+                gl_FragColor = starColor;
+            }
+        `,
+        transparent: true
+    });    
 
-starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    var starField = new THREE.Points(starsGeometry, starMaterial);
 
-var starMaterial = new THREE.PointsMaterial({ color: 0x888888 });
-
-var starField = new THREE.Points(starsGeometry, starMaterial);
-
-scene.add(starField);
-
-
+    scene.add(starField);
 
 // Variable to keep track of time
 var clock = new THREE.Clock();
@@ -293,13 +319,19 @@ var animate = function () {
         var y = Math.sin(theta) * orbitRadiusY;
         planet.mesh.position.set(x, 0, y);
         planet.angle += planet.speed;
-
+    
         // Rotating planet on its axis
         planet.mesh.rotation.y += planet.rotationSpeed/50;
-
+    
+        // If the planet has a ring, rotate the ring as well
+        if(planet.ring){
+            planet.ring.rotation.y += planet.rotationSpeed/50;
+        }
+    
         // Update spotlight target to follow planet
         spotLights[index].target.position.set(x, 0, y);
     });
+    
     // Star twinkling
     var time = clock.getElapsedTime();
     starField.material.opacity = (1 + Math.sin(time * 0.5)) * 0.5; // Adjust frequency and amplitude for different effects
